@@ -10,6 +10,7 @@ on:
 jobs:
   deploy:
     name: Deploy to Render
+    if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
