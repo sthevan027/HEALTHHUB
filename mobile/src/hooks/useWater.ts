@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import api from '../services/api';
-import { storage } from '../services/storage';
-import { scheduleWaterNotification } from '../services/notifications';
+import { writeCache, readCache } from '../services/storage';
+import { syncWaterMilestones } from '../utils/waterMilestones';
+import { WATER_GOAL_ML } from '../constants/goals';
 
 export interface WaterEntry {
   id: string;
@@ -17,13 +18,12 @@ export interface WaterData {
   goal_ml: number;
 }
 
-const GOAL_ML = 2000;
-const notifiedMilestones = new Set<number>();
-
 export function useWater() {
-  const [data, setData] = useState<WaterData>({ entries: [], total_ml: 0, goal_ml: GOAL_ML });
+  const [data, setData] = useState<WaterData>({ entries: [], total_ml: 0, goal_ml: WATER_GOAL_ML });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const cacheKey = (dateStr: string) => `water_${dateStr}`;
 
   const fetchWater = useCallback(async (date?: string) => {
     const dateStr = date || format(new Date(), 'yyyy-MM-dd');
@@ -32,9 +32,9 @@ export function useWater() {
     try {
       const res = await api.get<WaterData>(`/water?date=${dateStr}`);
       setData(res.data);
-      await storage.set(`water_${dateStr}`, res.data);
+      await writeCache(cacheKey(dateStr), res.data);
     } catch (err) {
-      const cached = await storage.get<WaterData>(`water_${dateStr}`);
+      const cached = await readCache<WaterData>(cacheKey(dateStr));
       if (cached) setData(cached);
       setError((err as Error).message);
     } finally {
@@ -48,15 +48,8 @@ export function useWater() {
       await api.post('/water', { amount_ml, date: dateStr });
       const res = await api.get<WaterData>(`/water?date=${dateStr}`);
       setData(res.data);
-      await storage.set(`water_${dateStr}`, res.data);
-
-      const pct = Math.round((res.data.total_ml / GOAL_ML) * 100);
-      for (const milestone of [50, 75, 100]) {
-        if (pct >= milestone && !notifiedMilestones.has(milestone)) {
-          notifiedMilestones.add(milestone);
-          await scheduleWaterNotification(milestone);
-        }
-      }
+      await writeCache(cacheKey(dateStr), res.data);
+      await syncWaterMilestones(dateStr, res.data.total_ml);
     } catch (err) {
       setError((err as Error).message);
       throw err;
@@ -69,6 +62,8 @@ export function useWater() {
       await api.delete(`/water/${id}`);
       const res = await api.get<WaterData>(`/water?date=${dateStr}`);
       setData(res.data);
+      await writeCache(cacheKey(dateStr), res.data);
+      await syncWaterMilestones(dateStr, res.data.total_ml);
     } catch (err) {
       setError((err as Error).message);
       throw err;

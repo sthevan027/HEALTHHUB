@@ -1,14 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
-  ActivityIndicator,
+  ActivityIndicator, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
+import { LineChart } from 'react-native-chart-kit';
 import api from '../services/api';
 import ProgressBar from '../components/ProgressBar';
+import { WATER_GOAL_ML } from '../constants/goals';
+import { normalizeWeekWater } from '../utils/weekWater';
 
 interface DashboardStats {
   water: { total_ml: number; goal_ml: number };
@@ -24,6 +27,8 @@ const COLORS = {
   success: '#27ae60',
   bg: '#f8f9fa',
 };
+
+const chartWidth = Dimensions.get('window').width - 64;
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +50,7 @@ export default function DashboardScreen() {
 
       const water = waterRes.status === 'fulfilled'
         ? waterRes.value.data
-        : { total_ml: 0, goal_ml: 2000 };
+        : { total_ml: 0, goal_ml: WATER_GOAL_ML };
       const meals = mealsRes.status === 'fulfilled'
         ? { count: mealsRes.value.data.meals.length }
         : { count: 0 };
@@ -80,6 +85,15 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadStats]);
 
+  const chartConfig = useMemo(() => {
+    if (!stats) return null;
+    const { labels, data } = normalizeWeekWater(stats.weekWater);
+    return {
+      labels,
+      datasets: [{ data, color: () => COLORS.water, strokeWidth: 2 }],
+    };
+  }, [stats]);
+
   const score = stats
     ? Math.round(
         (Math.min(stats.water.total_ml / stats.water.goal_ml, 1) * 33) +
@@ -108,21 +122,19 @@ export default function DashboardScreen() {
         <Text style={styles.date}>{todayLabel}</Text>
       </View>
 
-      {/* Score Card */}
       <View style={styles.scoreCard}>
         <Text style={styles.scoreLabel}>Pontuação do Dia</Text>
         <Text style={styles.scoreValue}>{score}%</Text>
         <ProgressBar current={score} total={100} color={COLORS.success} unit="%" />
       </View>
 
-      {/* Stat Cards */}
       <View style={styles.cardsRow}>
         <StatCard
           icon="water"
           color={COLORS.water}
           title="Água"
           value={`${stats?.water.total_ml || 0}ml`}
-          subtitle={`Meta: ${stats?.water.goal_ml || 2000}ml`}
+          subtitle={`Meta: ${stats?.water.goal_ml || WATER_GOAL_ML}ml`}
         />
         <StatCard
           icon="restaurant"
@@ -149,7 +161,6 @@ export default function DashboardScreen() {
         />
       </View>
 
-      {/* Water Progress */}
       {stats && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>💧 Hidratação</Text>
@@ -163,29 +174,27 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Week Water Stats */}
-      {stats && stats.weekWater.length > 0 && (
+      {stats && chartConfig && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📊 Água - Últimos 7 dias</Text>
-          {stats.weekWater.map((day) => (
-            <View key={day.date} style={styles.weekRow}>
-              <Text style={styles.weekDate}>
-                {format(new Date(day.date + 'T12:00:00'), 'EEE dd/MM', { locale: ptBR })}
-              </Text>
-              <View style={styles.weekBarContainer}>
-                <View
-                  style={[
-                    styles.weekBar,
-                    {
-                      width: `${Math.min((day.total_ml / 2000) * 100, 100)}%`,
-                      backgroundColor: COLORS.water,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.weekMl}>{day.total_ml}ml</Text>
-            </View>
-          ))}
+          <LineChart
+            data={chartConfig}
+            width={chartWidth}
+            height={200}
+            chartConfig={{
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 0,
+              color: () => COLORS.water,
+              labelColor: () => '#7f8c8d',
+              propsForDots: { r: '4', strokeWidth: '2', stroke: COLORS.water },
+            }}
+            bezier
+            style={styles.chart}
+            yAxisSuffix="ml"
+            fromZero
+          />
         </View>
       )}
     </ScrollView>
@@ -259,9 +268,5 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#2c3e50', marginBottom: 12 },
-  weekRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  weekDate: { fontSize: 11, color: '#7f8c8d', width: 60, textTransform: 'capitalize' },
-  weekBarContainer: { flex: 1, height: 8, backgroundColor: '#ecf0f1', borderRadius: 4, overflow: 'hidden', marginHorizontal: 8 },
-  weekBar: { height: '100%', borderRadius: 4 },
-  weekMl: { fontSize: 11, color: '#3498db', fontWeight: '600', width: 50, textAlign: 'right' },
+  chart: { borderRadius: 12, marginLeft: -8 },
 });

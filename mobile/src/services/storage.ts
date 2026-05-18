@@ -16,7 +16,7 @@ export const storage = {
     try {
       await AsyncStorage.setItem(`${PREFIX}${key}`, JSON.stringify(value));
     } catch {
-      console.error('[storage] Failed to save:', key);
+      if (__DEV__) console.error('[storage] Failed to save:', key);
     }
   },
 
@@ -24,7 +24,15 @@ export const storage = {
     try {
       await AsyncStorage.removeItem(`${PREFIX}${key}`);
     } catch {
-      console.error('[storage] Failed to remove:', key);
+      if (__DEV__) console.error('[storage] Failed to remove:', key);
     }
   },
 };
+
+export async function readCache<T>(key: string): Promise<T | null> {
+  return storage.get<T>(key);
+}
+
+export async function writeCache<T>(key: string, value: T): Promise<void> {
+  await storage.set(key, value);
+}

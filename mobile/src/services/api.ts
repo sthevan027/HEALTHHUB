@@ -12,7 +12,9 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    console.log(`[api] ${config.method?.toUpperCase()} ${config.url}`);
+    if (__DEV__) {
+      console.log(`[api] ${config.method?.toUpperCase()} ${config.url}`);
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -22,7 +24,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.error || error.message || 'Network error';
-    console.error(`[api] Error: ${message}`);
+    if (__DEV__) console.error(`[api] Error: ${message}`);
     return Promise.reject(new Error(message));
   }
 );

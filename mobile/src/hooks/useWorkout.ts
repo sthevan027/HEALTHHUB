@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import api from '../services/api';
-import { storage } from '../services/storage';
+import { writeCache, readCache } from '../services/storage';
 
 export interface Workout {
   id: string;
@@ -37,6 +37,8 @@ export function useWorkout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const workoutCacheKey = (dateStr: string) => `workouts_${dateStr}`;
+
   const fetchWorkouts = useCallback(async (date?: string) => {
     const dateStr = date || format(new Date(), 'yyyy-MM-dd');
     setLoading(true);
@@ -44,9 +46,9 @@ export function useWorkout() {
     try {
       const res = await api.get<{ workouts: Workout[] }>(`/workouts?date=${dateStr}`);
       setWorkouts(res.data.workouts);
-      await storage.set(`workouts_${dateStr}`, res.data.workouts);
+      await writeCache(workoutCacheKey(dateStr), res.data.workouts);
     } catch (err) {
-      const cached = await storage.get<Workout[]>(`workouts_${dateStr}`);
+      const cached = await readCache<Workout[]>(workoutCacheKey(dateStr));
       if (cached) setWorkouts(cached);
       setError((err as Error).message);
     } finally {
@@ -56,48 +58,71 @@ export function useWorkout() {
 
   const fetchMonthStats = useCallback(async (year: number, month: number) => {
     try {
-      const res = await api.get<{ monthStats: MonthStat[] }>(`/workouts/month?year=${year}&month=${month}`);
-      setMonthStats(res.data.monthStats);
+      const res = await api.get<{ monthStats: MonthStat[] }>(
+        `/workouts/month?year=${year}&month=${month}`
+      );
+      const normalized = res.data.monthStats.map((s) => ({
+        ...s,
+        date: typeof s.date === 'string' ? s.date.slice(0, 10) : String(s.date).slice(0, 10),
+        count: Number(s.count),
+        completed_count: Number(s.completed_count),
+      }));
+      setMonthStats(normalized);
     } catch {
-      // month stats failure is non-critical
+      // non-critical
     }
   }, []);
+
+  const refreshMonthForDate = useCallback(async (dateStr: string) => {
+    const d = new Date(`${dateStr}T12:00:00`);
+    await fetchMonthStats(d.getFullYear(), d.getMonth() + 1);
+  }, [fetchMonthStats]);
 
   const addWorkout = useCallback(async (input: CreateWorkoutInput, date?: string) => {
     const dateStr = date || format(new Date(), 'yyyy-MM-dd');
     try {
       await api.post('/workouts', { ...input, date: dateStr });
-      const res = await api.get<{ workouts: Workout[] }>(`/workouts?date=${dateStr}`);
-      setWorkouts(res.data.workouts);
+      await fetchWorkouts(dateStr);
+      await refreshMonthForDate(dateStr);
     } catch (err) {
       setError((err as Error).message);
       throw err;
     }
-  }, []);
+  }, [fetchWorkouts, refreshMonthForDate]);
 
   const toggleComplete = useCallback(async (id: string, completed: boolean, date?: string) => {
     const dateStr = date || format(new Date(), 'yyyy-MM-dd');
     try {
       await api.put(`/workouts/${id}`, { completed });
-      const res = await api.get<{ workouts: Workout[] }>(`/workouts?date=${dateStr}`);
-      setWorkouts(res.data.workouts);
+      await fetchWorkouts(dateStr);
+      await refreshMonthForDate(dateStr);
     } catch (err) {
       setError((err as Error).message);
       throw err;
     }
-  }, []);
+  }, [fetchWorkouts, refreshMonthForDate]);
 
   const deleteWorkout = useCallback(async (id: string, date?: string) => {
     const dateStr = date || format(new Date(), 'yyyy-MM-dd');
     try {
       await api.delete(`/workouts/${id}`);
-      const res = await api.get<{ workouts: Workout[] }>(`/workouts?date=${dateStr}`);
-      setWorkouts(res.data.workouts);
+      await fetchWorkouts(dateStr);
+      await refreshMonthForDate(dateStr);
     } catch (err) {
       setError((err as Error).message);
       throw err;
     }
-  }, []);
+  }, [fetchWorkouts, refreshMonthForDate]);
 
-  return { workouts, monthStats, loading, error, fetchWorkouts, fetchMonthStats, addWorkout, toggleComplete, deleteWorkout };
+  return {
+    workouts,
+    monthStats,
+    loading,
+    error,
+    fetchWorkouts,
+    fetchMonthStats,
+    addWorkout,
+    toggleComplete,
+    deleteWorkout,
+  };
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Alert, ActivityIndicator, RefreshControl,
+  TextInput, Modal, Alert, ActivityIndicator, RefreshControl, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
@@ -115,14 +115,18 @@ export default function WaterScreen() {
       {/* History */}
       <View style={styles.historySection}>
         <Text style={styles.sectionTitle}>Histórico de hoje</Text>
-        {data.entries.length === 0 ? (
-          <View style={styles.empty}>
-            <Ionicons name="water-outline" size={40} color="#bdc3c7" />
-            <Text style={styles.emptyText}>Nenhum registro ainda</Text>
-          </View>
-        ) : (
-          data.entries.map((entry) => (
-            <View key={entry.id} style={styles.historyItem}>
+        <FlatList
+          data={data.entries}
+          scrollEnabled={false}
+          keyExtractor={(entry) => entry.id}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="water-outline" size={40} color="#bdc3c7" />
+              <Text style={styles.emptyText}>Nenhum registro ainda</Text>
+            </View>
+          }
+          renderItem={({ item: entry }) => (
+            <View style={styles.historyItem}>
               <Ionicons name="water" size={20} color={COLORS.water} />
               <View style={styles.historyInfo}>
                 <Text style={styles.historyAmount}>{entry.amount_ml} ml</Text>
@@ -134,8 +138,8 @@ export default function WaterScreen() {
                 <Ionicons name="trash-outline" size={18} color="#e74c3c" />
               </TouchableOpacity>
             </View>
-          ))
-        )}
+          )}
+        />
       </View>
 
       {/* Custom Modal */}

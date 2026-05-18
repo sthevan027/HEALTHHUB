@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Workout } from '../hooks/useWorkout';
@@ -9,7 +9,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export default function WorkoutItem({ workout, onToggle, onDelete }: Props) {
+function WorkoutItem({ workout, onToggle, onDelete }: Props) {
   return (
     <View style={[styles.item, workout.completed && styles.completed]}>
       <TouchableOpacity
@@ -27,25 +27,23 @@ export default function WorkoutItem({ workout, onToggle, onDelete }: Props) {
           {workout.exercise}
         </Text>
         <View style={styles.meta}>
-          {workout.sets && workout.reps && (
+          {workout.sets != null && workout.reps != null && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{workout.sets}x{workout.reps}</Text>
             </View>
           )}
-          {workout.weight_kg && (
+          {workout.weight_kg != null && (
             <View style={[styles.badge, styles.weightBadge]}>
               <Text style={styles.badgeText}>{workout.weight_kg}kg</Text>
             </View>
           )}
-          {workout.duration_minutes && (
+          {workout.duration_minutes != null && (
             <View style={[styles.badge, styles.timeBadge]}>
               <Text style={styles.badgeText}>{workout.duration_minutes}min</Text>
             </View>
           )}
         </View>
-        {workout.notes && (
-          <Text style={styles.notes}>{workout.notes}</Text>
-        )}
+        {workout.notes ? <Text style={styles.notes}>{workout.notes}</Text> : null}
       </View>
       <TouchableOpacity onPress={() => onDelete(workout.id)} style={styles.deleteBtn}>
         <Ionicons name="trash-outline" size={18} color="#e74c3c" />
@@ -53,6 +51,8 @@ export default function WorkoutItem({ workout, onToggle, onDelete }: Props) {
     </View>
   );
 }
+
+export default memo(WorkoutItem);
 
 const styles = StyleSheet.create({
   item: {
