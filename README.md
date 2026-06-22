@@ -1,5 +1,9 @@
 # HealthHub
 
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+
+![Expo](https://img.shields.io/badge/Expo-50-000020?logo=expo&logoColor=white) ![React Native](https://img.shields.io/badge/React%20Native-0.73-61DAFB?logo=react&logoColor=black) ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+
 App iOS pessoal (React Native + Expo) para rastrear hidratação, refeições e treinos.
 
 ## Stack
